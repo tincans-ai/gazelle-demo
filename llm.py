@@ -73,7 +73,8 @@ with gazelle_image.imports():
     gpu="A10G",
     container_idle_timeout=120,
     secrets=[modal.Secret.from_name("hf_read_token")],
-    concurrency_limit=8,
+    concurrency_limit=32,
+    keep_warm=1,
 )
 class GazelleModel:
     @modal.enter()
@@ -228,8 +229,9 @@ web_image = (
 
 @stub.cls(
     image=web_image,
-    concurrency_limit=8,
+    concurrency_limit=128,
     container_idle_timeout=300,
+    keep_warm=2,
 )
 class GradioWrapper:
     def __init__(self):
@@ -254,6 +256,7 @@ class GradioWrapper:
             if mic_audio and upload_audio:
                 raise ValueError("Only one audio input is allowed")
 
+            print("about to call remote gen")
             for result in gz.generate.remote_gen(input, audio):
                 final_str += result
                 yield final_str
