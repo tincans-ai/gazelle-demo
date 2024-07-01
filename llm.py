@@ -16,6 +16,7 @@ from fastapi import FastAPI
 
 stub = modal.Stub("gazelle-demo")
 
+AUDIO_TOKEN = "<|audio|>"
 MODEL_NAME = "tincans-ai/gazelle-v0.2"
 AUDIO_MODEL_NAME = "facebook/wav2vec2-base-960h"
 MODEL_DIR = "/model"
@@ -64,6 +65,7 @@ with gazelle_image.imports():
     from transformers import (
         AutoProcessor,
         AutoTokenizer,
+        AutoFeatureExtractor,
         TextIteratorStreamer,
     )
 
@@ -91,7 +93,10 @@ class GazelleModel:
 
         print(f"Model loaded in {time.time() - t0:.2f}s")
 
-        self.audio_processor = AutoProcessor.from_pretrained(AUDIO_MODEL_NAME)
+        if "bert" in AUDIO_MODEL_NAME:
+            self.audio_processor = AutoFeatureExtractor.from_pretrained(AUDIO_MODEL_NAME)
+        else:
+            self.audio_processor = AutoProcessor.from_pretrained(AUDIO_MODEL_NAME)
         self.tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
         self.streamer = TextIteratorStreamer(
             self.tokenizer, skip_prompt=True, skip_special_tokens=True
@@ -105,13 +110,13 @@ class GazelleModel:
         if input == "" and not audio:
             return
 
-        if "<|audio|>" in input and not audio:
+        if AUDIO_TOKEN in input and not audio:
             raise ValueError(
-                "Audio input required if '<|audio|>' token is present in input"
+                f"Audio input required if '{AUDIO_TOKEN}' token is present in input"
             )
 
-        if audio and "<|audio|>" not in input:
-            input = "<|audio|> \n\n" + input
+        if audio and AUDIO_TOKEN not in input:
+            input = "AUDIO_TOKEN \n\n" + input
 
         t0 = time.time()
 
@@ -307,13 +312,13 @@ class GradioWrapper:
                 gr.Audio(source="upload"),
             ],
             outputs="textbox",
-            title="🦌 Gazelle v0.2",
-            description="""Gazelle is a joint speech-language model by [Tincans](https://tincans.ai) 🥫 - for more details and prompt ideas, see our [v0.2 announcement](https://tincans.ai/slm3). This is an *early research preview* -- please temper expectations!
-        Gazelle can take in text and audio as input (interchangeably) and generates text as output.
-        You can further synthesize the text output into audio via a TTS provider (not implemented here). Some example tasks include transcribing audio, answering questions, or understanding spoken audio. This approach will be superior for business use cases where latency and conversational quality matter - such as customer support, outbound sales, and more.
+            title="🦌 Gazelle",
+            description="""Gazelle is a joint speech-language model by [Tincans](https://tincans.ai) 🥫.
         
-        Known limitations exist! The model was only trained on English audio and is not expected to work well with other languages. Similarly, the model does not handle accents well yet. The gradio demo may have bugs with sample rate for audio. We also only accept a single audio input (microphone or upload).
-
+        For more details and prompt ideas, see our [v0.2 announcement](https://tincans.ai/slm3). This is an *early research preview* -- please temper expectations!
+        Gazelle can interchangeably take in text and audio as input and generates a response in text.
+        You can further synthesize the text output into audio via a TTS provider (not implemented here). Example tasks include transcribing audio, answering questions, or understanding spoken audio. This approach is superior for business use cases where latency and conversational quality matter - such as customer support, outbound sales, and more.
+        
         Inference is done via serverless GPU's on [Modal](https://modal.com). As such, you may experience cold start delays (about 30 seconds) on first use, but subsequent responses will be faster.
         This demo is purposefully not optimized for inference speed, but rather to showcase the capabilities of Gazelle. We do not store any responses.
 
